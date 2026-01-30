@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.title("Loan Approval Analysis")
 
 # Load dataset
-df = pd.read_csv("LP_TRain.csv")
+df = pd.read_csv("LP_Train.csv")
 
 st.subheader("Dataset Preview")
 st.dataframe(df.head())
