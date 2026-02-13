@@ -1,128 +1,109 @@
 import streamlit as st
 import pandas as pd
-import seaborn as sb
-import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
-st.set_page_config(page_title="Loan Approval Analysis", layout="wide")
+st.set_page_config(page_title="Loan Approval Dashboard", layout="wide")
 
-st.title("🏦 Loan Approval Analysis & Prediction App")
+st.title("🏦 Loan Approval Analysis & Interactive Dashboard")
+st.markdown("Final Year Project - Data Analytics")
 
-# -----------------------------
-# LOAD DATA
-# -----------------------------
+# Load dataset
 @st.cache_data
 def load_data():
-    df = pd.read_csv("LP_Train.csv")
-    
-    df['Gender'].fillna('Male', inplace=True)
-    df['Married'].fillna('Yes', inplace=True)
-    df['Dependents'].fillna(0, inplace=True)
-    df['Self_Employed'].fillna('No', inplace=True)
-    df['LoanAmount'].fillna(128.0, inplace=True)
-    df['Loan_Amount_Term'].fillna(360.0, inplace=True)
-    df['Credit_History'].fillna(1.0, inplace=True)
-    
-    df['Dependents'] = df['Dependents'].replace('[+]', '', regex=True).astype(int)
-    
-    return df
+    return pd.read_csv("LP_Train.csv")
 
 df = load_data()
 
-# -----------------------------
-# SIDEBAR
-# -----------------------------
-st.sidebar.header("📊 Navigation")
-option = st.sidebar.radio(
-    "Select Section",
-    ["Dataset Overview", "EDA Visualizations", "Loan Approval Predictor"]
+# Sidebar Filters
+st.sidebar.header("🔎 Filter Data")
+
+gender_filter = st.sidebar.multiselect(
+    "Select Gender",
+    options=df["Gender"].dropna().unique(),
+    default=df["Gender"].dropna().unique()
 )
 
-# -----------------------------
-# DATASET OVERVIEW
-# -----------------------------
-if option == "Dataset Overview":
-    st.subheader("📄 Dataset Preview")
-    st.dataframe(df.head())
+property_filter = st.sidebar.multiselect(
+    "Select Property Area",
+    options=df["Property_Area"].dropna().unique(),
+    default=df["Property_Area"].dropna().unique()
+)
 
-    st.subheader("📌 Data Summary")
-    st.write(df.describe())
+filtered_df = df[
+    (df["Gender"].isin(gender_filter)) &
+    (df["Property_Area"].isin(property_filter))
+]
 
-    st.subheader("🧾 Missing Values")
-    st.write(df.isnull().sum())
+# KPI Metrics
+st.subheader("📊 Key Performance Indicators")
 
-# -----------------------------
-# EDA VISUALIZATIONS
-# -----------------------------
-elif option == "EDA Visualizations":
-    st.subheader("📈 Exploratory Data Analysis")
+col1, col2, col3 = st.columns(3)
 
-    col1, col2 = st.columns(2)
+total_apps = len(filtered_df)
+approved = len(filtered_df[filtered_df["Loan_Status"] == "Y"])
+approval_rate = round((approved / total_apps) * 100, 2) if total_apps > 0 else 0
 
-    with col1:
-        st.write("Loan Status vs Credit History")
-        fig, ax = plt.subplots()
-        pd.crosstab(df['Loan_Status'], df['Credit_History']).plot(kind='bar', ax=ax)
-        plt.xticks(rotation=0)
-        st.pyplot(fig)
+col1.metric("Total Applications", total_apps)
+col2.metric("Approved Loans", approved)
+col3.metric("Approval Rate (%)", approval_rate)
 
-    with col2:
-        st.write("Loan Status vs Applicant Income")
-        fig, ax = plt.subplots()
-        sb.boxplot(x=df['Loan_Status'], y=df['ApplicantIncome'], ax=ax)
-        st.pyplot(fig)
-
-    st.write("Property Area vs Loan Status")
-    fig, ax = plt.subplots()
-    pd.crosstab(df['Property_Area'], df['Loan_Status']).plot(kind='bar', ax=ax)
-    plt.xticks(rotation=0)
-    st.pyplot(fig)
-
-# -----------------------------
-# LOAN APPROVAL PREDICTOR
-# -----------------------------
-elif option == "Loan Approval Predictor":
-    st.subheader("🧮 Check Your Loan Approval Chances")
-
-    name = st.text_input("Applicant Name")
-    income = st.number_input("Applicant Income", min_value=0)
-    co_income = st.number_input("Coapplicant Income", min_value=0)
-    loan_amt = st.number_input("Loan Amount", min_value=0)
-    credit = st.selectbox("Credit History", [1.0, 0.0])
-    education = st.selectbox("Education", ["Graduate", "Not Graduate"])
-    married = st.selectbox("Married", ["Yes", "No"])
-
-    if st.button("Check Approval Chance"):
-        score = 0
-
-        # Simple scoring logic
-        if credit == 1.0:
-            score += 50
-        if income > 5000:
-            score += 20
-        if co_income > 2000:
-            score += 10
-        if loan_amt < 200:
-            score += 10
-        if education == "Graduate":
-            score += 5
-        if married == "Yes":
-            score += 5
-
-        if score >= 70:
-            st.success(f"✅ {name}, High Chance of Loan Approval! ({score}%)")
-        elif score >= 50:
-            st.warning(f"⚠️ {name}, Moderate Chance of Loan Approval ({score}%)")
-        else:
-            st.error(f"❌ {name}, Low Chance of Loan Approval ({score}%)")
-
-        st.info("📌 This is a rule-based estimation for educational purposes.")
-
-# -----------------------------
-# FOOTER
-# -----------------------------
 st.markdown("---")
-st.markdown("")
+
+# Visualization Section
+col4, col5 = st.columns(2)
+
+with col4:
+    st.subheader("Loan Status Distribution")
+    fig1, ax1 = plt.subplots()
+    sns.countplot(x="Loan_Status", data=filtered_df, ax=ax1)
+    st.pyplot(fig1)
+
+with col5:
+    st.subheader("Credit History Impact")
+    fig2, ax2 = plt.subplots()
+    sns.countplot(x="Credit_History", hue="Loan_Status", data=filtered_df, ax=ax2)
+    st.pyplot(fig2)
+
+st.markdown("---")
+
+# Income Analysis
+st.subheader("💰 Income Analysis")
+
+fig3, ax3 = plt.subplots()
+sns.boxplot(x="Loan_Status", y="ApplicantIncome", data=filtered_df, ax=ax3)
+st.pyplot(fig3)
+
+st.markdown("---")
+
+# Correlation Heatmap
+st.subheader("📈 Correlation Analysis")
+
+numeric_df = filtered_df.select_dtypes(include=np.number)
+
+if not numeric_df.empty:
+    fig4, ax4 = plt.subplots()
+    sns.heatmap(numeric_df.corr(), annot=True, cmap="coolwarm", ax=ax4)
+    st.pyplot(fig4)
+else:
+    st.warning("Not enough numeric data for correlation.")
+
+st.markdown("---")
+
+# Loan Prediction Demo (Rule-Based Logic)
+st.subheader("🔮 Loan Approval Prediction (Demo Model)")
+
+income = st.number_input("Applicant Income", min_value=0)
+credit = st.selectbox("Credit History (1 = Good, 0 = Bad)", [1, 0])
+loan_amount = st.number_input("Loan Amount", min_value=0)
+
+if st.button("Predict Loan Status"):
+    if credit == 1 and income > 3000 and loan_amount < 200:
+        st.success("Loan Likely to be Approved ✅")
+    else:
+        st.error("Loan Likely to be Rejected ❌")
+
+st.markdown("---")
+
+st.success("✅ Interactive Dashboard Loaded Successfully")
