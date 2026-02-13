@@ -1,109 +1,170 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+import plotly.express as px
 
-st.set_page_config(page_title="Loan Approval Dashboard", layout="wide")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="Loan Risk Assessment System",
+                   layout="wide",
+                   page_icon="💼")
 
-st.title("🏦 Loan Approval Analysis & Interactive Dashboard")
-st.markdown("Final Year Project - Data Analytics")
+# ---------------- CUSTOM CSS ----------------
+st.markdown("""
+<style>
+.metric-card {
+    background-color: #f0f2f6;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Load dataset
-@st.cache_data
-def load_data():
-    return pd.read_csv("LP_Train.csv")
+st.title("💼 Loan Approval Risk Assessment & Decision Support System")
 
-df = load_data()
+# ---------------- SIDEBAR ----------------
+st.sidebar.header("📂 Upload Dataset")
+file = st.sidebar.file_uploader("Upload CSV File", type=["csv"])
 
-# Sidebar Filters
-st.sidebar.header("🔎 Filter Data")
+page = st.sidebar.radio("Navigation",
+                        ["📊 Dashboard",
+                         "🧠 Loan Decision System",
+                         "💰 EMI Calculator"])
 
-gender_filter = st.sidebar.multiselect(
-    "Select Gender",
-    options=df["Gender"].dropna().unique(),
-    default=df["Gender"].dropna().unique()
-)
+if file:
 
-property_filter = st.sidebar.multiselect(
-    "Select Property Area",
-    options=df["Property_Area"].dropna().unique(),
-    default=df["Property_Area"].dropna().unique()
-)
+    df = pd.read_csv(file)
 
-filtered_df = df[
-    (df["Gender"].isin(gender_filter)) &
-    (df["Property_Area"].isin(property_filter))
-]
+    # ---------------- SIDEBAR FILTERS ----------------
+    st.sidebar.header("🔍 Filters")
 
-# KPI Metrics
-st.subheader("📊 Key Performance Indicators")
+    gender_filter = st.sidebar.multiselect(
+        "Select Gender",
+        options=df["Gender"].unique(),
+        default=df["Gender"].unique()
+    )
 
-col1, col2, col3 = st.columns(3)
+    area_filter = st.sidebar.multiselect(
+        "Select Property Area",
+        options=df["Property_Area"].unique(),
+        default=df["Property_Area"].unique()
+    )
 
-total_apps = len(filtered_df)
-approved = len(filtered_df[filtered_df["Loan_Status"] == "Y"])
-approval_rate = round((approved / total_apps) * 100, 2) if total_apps > 0 else 0
+    df = df[(df["Gender"].isin(gender_filter)) &
+            (df["Property_Area"].isin(area_filter))]
 
-col1.metric("Total Applications", total_apps)
-col2.metric("Approved Loans", approved)
-col3.metric("Approval Rate (%)", approval_rate)
+    # ================= DASHBOARD =================
+    if page == "📊 Dashboard":
 
-st.markdown("---")
+        st.subheader("📊 Data Overview")
 
-# Visualization Section
-col4, col5 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
 
-with col4:
-    st.subheader("Loan Status Distribution")
-    fig1, ax1 = plt.subplots()
-    sns.countplot(x="Loan_Status", data=filtered_df, ax=ax1)
-    st.pyplot(fig1)
+        col1.metric("Total Applicants", len(df))
+        col2.metric("Approved",
+                    df[df["Loan_Status"] == "Y"].shape[0])
+        col3.metric("Rejected",
+                    df[df["Loan_Status"] == "N"].shape[0])
+        col4.metric("Avg Income",
+                    round(df["ApplicantIncome"].mean(), 2))
 
-with col5:
-    st.subheader("Credit History Impact")
-    fig2, ax2 = plt.subplots()
-    sns.countplot(x="Credit_History", hue="Loan_Status", data=filtered_df, ax=ax2)
-    st.pyplot(fig2)
+        st.markdown("---")
 
-st.markdown("---")
+        col1, col2 = st.columns(2)
 
-# Income Analysis
-st.subheader("💰 Income Analysis")
+        fig1 = px.histogram(df,
+                            x="ApplicantIncome",
+                            title="Income Distribution")
+        col1.plotly_chart(fig1, use_container_width=True)
 
-fig3, ax3 = plt.subplots()
-sns.boxplot(x="Loan_Status", y="ApplicantIncome", data=filtered_df, ax=ax3)
-st.pyplot(fig3)
+        fig2 = px.pie(df,
+                      names="Loan_Status",
+                      title="Loan Approval Ratio")
+        col2.plotly_chart(fig2, use_container_width=True)
 
-st.markdown("---")
+        fig3 = px.scatter(df,
+                          x="ApplicantIncome",
+                          y="LoanAmount",
+                          color="Loan_Status",
+                          title="Income vs Loan Amount")
+        st.plotly_chart(fig3, use_container_width=True)
 
-# Correlation Heatmap
-st.subheader("📈 Correlation Analysis")
+        # Download Button
+        st.download_button("⬇ Download Filtered Data",
+                           df.to_csv(index=False),
+                           "filtered_data.csv",
+                           "text/csv")
 
-numeric_df = filtered_df.select_dtypes(include=np.number)
+    # ================= LOAN DECISION =================
+    elif page == "🧠 Loan Decision System":
 
-if not numeric_df.empty:
-    fig4, ax4 = plt.subplots()
-    sns.heatmap(numeric_df.corr(), annot=True, cmap="coolwarm", ax=ax4)
-    st.pyplot(fig4)
+        st.subheader("🧠 Smart Loan Eligibility Checker")
+
+        income = st.number_input("Monthly Income (₹)")
+        loan_amount = st.number_input("Loan Amount (₹)")
+        credit = st.selectbox("Credit History (1=Good, 0=Bad)", [1, 0])
+
+        if st.button("Check Eligibility"):
+
+            risk_score = 0
+
+            if income > 50000:
+                risk_score += 40
+            elif income > 30000:
+                risk_score += 25
+            else:
+                risk_score += 10
+
+            if credit == 1:
+                risk_score += 40
+            else:
+                risk_score += 5
+
+            if loan_amount < income * 5:
+                risk_score += 20
+            else:
+                risk_score += 5
+
+            st.progress(risk_score / 100)
+
+            if risk_score >= 70:
+                decision = "✅ Approved"
+                category = "Low Risk"
+            elif risk_score >= 40:
+                decision = "⚠ Conditional Approval"
+                category = "Medium Risk"
+            else:
+                decision = "❌ Rejected"
+                category = "High Risk"
+
+            st.success(f"Decision: {decision}")
+            st.info(f"Risk Category: {category}")
+            st.write(f"Risk Score: {risk_score}%")
+
+    # ================= EMI CALCULATOR =================
+    elif page == "💰 EMI Calculator":
+
+        st.subheader("💰 EMI Calculator")
+
+        loan = st.number_input("Loan Amount (₹)")
+        rate = st.number_input("Interest Rate (%)")
+        tenure = st.number_input("Tenure (Years)")
+
+        if st.button("Calculate EMI"):
+
+            if rate > 0 and tenure > 0:
+
+                r = rate / (12 * 100)
+                n = tenure * 12
+
+                emi = (loan * r * (1 + r) ** n) / ((1 + r) ** n - 1)
+
+                st.success(f"Monthly EMI: ₹ {round(emi, 2)}")
+                st.write(f"Total Payment: ₹ {round(emi * n, 2)}")
+                st.write(f"Total Interest: ₹ {round((emi * n) - loan, 2)}")
+
+            else:
+                st.error("Please enter valid Interest Rate & Tenure.")
+
 else:
-    st.warning("Not enough numeric data for correlation.")
-
-st.markdown("---")
-
-# Loan Prediction Demo (Rule-Based Logic)
-st.subheader("🔮 Loan Approval Prediction (Demo Model)")
-
-income = st.number_input("Applicant Income", min_value=0)
-credit = st.selectbox("Credit History (1 = Good, 0 = Bad)", [1, 0])
-loan_amount = st.number_input("Loan Amount", min_value=0)
-
-if st.button("Predict Loan Status"):
-    if credit == 1 and income > 3000 and loan_amount < 200:
-        st.success("Loan Likely to be Approved ✅")
-    else:
-        st.error("Loan Likely to be Rejected ❌")
-
-st.markdown("---")
-
-st.success("✅ Interactive Dashboard Loaded Successfully")
+    st.warning("Please upload dataset to start the system.")
