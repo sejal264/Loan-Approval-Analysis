@@ -33,7 +33,7 @@ page = st.sidebar.radio("Navigation",
 
 if file:
 
-    df = pd.read_csv(file)
+    df = pd.read_csv("LP_Train.csv")
 
     # ---------------- SIDEBAR FILTERS ----------------
     st.sidebar.header("🔍 Filters")
