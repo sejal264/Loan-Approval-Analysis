@@ -3,165 +3,168 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-st.set_page_config(page_title="AI Loan Risk Analyzer", layout="wide")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="Loan Risk Assessment System",
+                   layout="wide",
+                   page_icon="💼")
 
-# ---------------- HEADER ----------------
+# ---------------- CUSTOM CSS ----------------
 st.markdown("""
-<h1 style='text-align: center; color: #4CAF50;'>
-💼 AI Loan Risk & Approval Intelligence System
-</h1>
-<p style='text-align: center;'>Smart Financial Decision Support Dashboard</p>
+<style>
+.metric-card {
+    background-color: #f0f2f6;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+}
+</style>
 """, unsafe_allow_html=True)
 
+st.title("💼 Loan Approval Risk Assessment & Decision Support System")
+
 # ---------------- SIDEBAR ----------------
-st.sidebar.title("🔍 Navigation")
-page = st.sidebar.radio("Go to", 
-                       ["📊 Dashboard", "🧠 Smart Loan Analyzer", "💰 EMI Planner"])
-
-st.sidebar.markdown("---")
 st.sidebar.header("📂 Upload Dataset")
-file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+file = st.sidebar.file_uploader("Upload CSV File", type=["csv"])
 
-# ---------------- DATA LOAD ----------------
-@st.cache_data
-def load_data(file):
-    df = pd.read_csv(file)
-    df.fillna(df.median(numeric_only=True), inplace=True)
-    return df
+page = st.sidebar.radio("Navigation",
+                        ["📊 Dashboard",
+                         "🧠 Loan Decision System",
+                         "💰 EMI Calculator"])
 
 if file:
-    df = load_data(file)
 
-    # ---------------- DASHBOARD ----------------
+    df = pd.read_csv("LP_Train.csv")
+
+    # ---------------- SIDEBAR FILTERS ----------------
+    st.sidebar.header("🔍 Filters")
+
+    gender_filter = st.sidebar.multiselect(
+        "Select Gender",
+        options=df["Gender"].unique(),
+        default=df["Gender"].unique()
+    )
+
+    area_filter = st.sidebar.multiselect(
+        "Select Property Area",
+        options=df["Property_Area"].unique(),
+        default=df["Property_Area"].unique()
+    )
+
+    df = df[(df["Gender"].isin(gender_filter)) &
+            (df["Property_Area"].isin(area_filter))]
+
+    # ================= DASHBOARD =================
     if page == "📊 Dashboard":
 
-        st.subheader("📊 Business Insights Dashboard")
+        st.subheader("📊 Data Overview")
 
         col1, col2, col3, col4 = st.columns(4)
 
         col1.metric("Total Applicants", len(df))
-        col2.metric("Approved", df[df["Loan_Status"]=="Y"].shape[0])
-        col3.metric("Rejected", df[df["Loan_Status"]=="N"].shape[0])
-        col4.metric("Avg Income", int(df["ApplicantIncome"].mean()))
+        col2.metric("Approved",
+                    df[df["Loan_Status"] == "Y"].shape[0])
+        col3.metric("Rejected",
+                    df[df["Loan_Status"] == "N"].shape[0])
+        col4.metric("Avg Income",
+                    round(df["ApplicantIncome"].mean(), 2))
 
         st.markdown("---")
 
-        # Filters
-        st.subheader("🔍 Filter Data")
-        status_filter = st.selectbox("Loan Status", ["All","Y","N"])
-
-        filtered_df = df.copy()
-        if status_filter != "All":
-            filtered_df = df[df["Loan_Status"]==status_filter]
-
         col1, col2 = st.columns(2)
 
-        fig1 = px.histogram(filtered_df, x="ApplicantIncome", 
-                            title="Income Distribution", nbins=30)
+        fig1 = px.histogram(df,
+                            x="ApplicantIncome",
+                            title="Income Distribution")
         col1.plotly_chart(fig1, use_container_width=True)
 
-        fig2 = px.pie(filtered_df, names="Loan_Status", 
-                      title="Approval Ratio")
+        fig2 = px.pie(df,
+                      names="Loan_Status",
+                      title="Loan Approval Ratio")
         col2.plotly_chart(fig2, use_container_width=True)
 
-        fig3 = px.scatter(filtered_df,
+        fig3 = px.scatter(df,
                           x="ApplicantIncome",
                           y="LoanAmount",
                           color="Loan_Status",
-                          size="LoanAmount",
-                          title="Income vs Loan (Risk Pattern)")
+                          title="Income vs Loan Amount")
         st.plotly_chart(fig3, use_container_width=True)
 
-        # Insights
-        st.markdown("### 📌 Key Insights")
-        st.info("Higher income + good credit history → higher approval chances")
+        # Download Button
+        st.download_button("⬇ Download Filtered Data",
+                           df.to_csv(index=False),
+                           "filtered_data.csv",
+                           "text/csv")
 
-    # ---------------- SMART ANALYZER ----------------
-    elif page == "🧠 Smart Loan Analyzer":
+    # ================= LOAN DECISION =================
+    elif page == "🧠 Loan Decision System":
 
-        st.subheader("🧠 AI-Based Loan Risk Analyzer")
+        st.subheader("🧠 Smart Loan Eligibility Checker")
 
-        col1, col2 = st.columns(2)
+        income = st.number_input("Monthly Income (₹)")
+        loan_amount = st.number_input("Loan Amount (₹)")
+        credit = st.selectbox("Credit History (1=Good, 0=Bad)", [1, 0])
 
-        income = col1.number_input("Monthly Income", 1000, 1000000)
-        loan = col2.number_input("Loan Amount", 1000, 1000000)
-        credit = st.selectbox("Credit History", ["Good","Bad"])
-        dependents = st.slider("Dependents", 0, 5, 1)
+        if st.button("Check Eligibility"):
 
-        if st.button("Analyze Application"):
-
-            score = 0
+            risk_score = 0
 
             if income > 50000:
-                score += 30
-            elif income > 25000:
-                score += 20
+                risk_score += 40
+            elif income > 30000:
+                risk_score += 25
             else:
-                score += 10
+                risk_score += 10
 
-            if loan < income * 4:
-                score += 30
+            if credit == 1:
+                risk_score += 40
             else:
-                score += 10
+                risk_score += 5
 
-            if credit == "Good":
-                score += 30
+            if loan_amount < income * 5:
+                risk_score += 20
             else:
-                score += 5
+                risk_score += 5
 
-            if dependents <= 2:
-                score += 10
+            st.progress(risk_score / 100)
 
-            # Risk Decision
-            if score >= 80:
+            if risk_score >= 70:
                 decision = "✅ Approved"
-                risk = "Low Risk"
-                color = "green"
-            elif score >= 50:
-                decision = "⚠️ Conditional"
-                risk = "Medium Risk"
-                color = "orange"
+                category = "Low Risk"
+            elif risk_score >= 40:
+                decision = "⚠ Conditional Approval"
+                category = "Medium Risk"
             else:
                 decision = "❌ Rejected"
-                risk = "High Risk"
-                color = "red"
+                category = "High Risk"
 
-            st.markdown(f"### 🎯 Decision: {decision}")
-            st.markdown(f"### 📊 Risk Level: {risk}")
-            st.progress(score/100)
+            st.success(f"Decision: {decision}")
+            st.info(f"Risk Category: {category}")
+            st.write(f"Risk Score: {risk_score}%")
 
-            st.markdown("### 📌 Explanation")
-            st.write("Decision is based on income strength, loan ratio, credit behavior and dependents.")
+    # ================= EMI CALCULATOR =================
+    elif page == "💰 EMI Calculator":
 
-    # ---------------- EMI ----------------
-    elif page == "💰 EMI Planner":
+        st.subheader("💰 EMI Calculator")
 
-        st.subheader("💰 Smart EMI Calculator")
-
-        loan = st.number_input("Loan Amount", 1000, 1000000)
-        rate = st.slider("Interest Rate (%)", 1.0, 20.0)
-        tenure = st.slider("Years", 1, 30)
+        loan = st.number_input("Loan Amount (₹)")
+        rate = st.number_input("Interest Rate (%)")
+        tenure = st.number_input("Tenure (Years)")
 
         if st.button("Calculate EMI"):
 
-            r = rate/(12*100)
-            n = tenure*12
+            if rate > 0 and tenure > 0:
 
-            emi = (loan*r*(1+r)**n)/((1+r)**n-1)
+                r = rate / (12 * 100)
+                n = tenure * 12
 
-            st.success(f"Monthly EMI: ₹ {round(emi,2)}")
+                emi = (loan * r * (1 + r) ** n) / ((1 + r) ** n - 1)
 
-            total = emi*n
-            interest = total - loan
+                st.success(f"Monthly EMI: ₹ {round(emi, 2)}")
+                st.write(f"Total Payment: ₹ {round(emi * n, 2)}")
+                st.write(f"Total Interest: ₹ {round((emi * n) - loan, 2)}")
 
-            col1, col2 = st.columns(2)
-            col1.metric("Total Payment", int(total))
-            col2.metric("Total Interest", int(interest))
-
-            fig = px.pie(values=[loan, interest],
-                         names=["Principal","Interest"],
-                         title="Payment Breakdown")
-            st.plotly_chart(fig)
+            else:
+                st.error("Please enter valid Interest Rate & Tenure.")
 
 else:
-    st.warning("📂 Upload dataset to start")
+    st.warning("Please upload dataset to start the system.")
